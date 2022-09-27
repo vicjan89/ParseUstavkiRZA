@@ -1,4 +1,5 @@
 import os
+import json
 
 import config
 
@@ -40,37 +41,68 @@ def find_prot(input_string: str, prot_name: str, filter: int = 0) -> list:
 count_prot = 0
 count_steps = 0
 
-for group_name in os.walk(config.path_source, topdown=True, onerror=None, followlinks=False):
-	for name in group_name[2]:
-		if name == 'Журжево.rst':
-			with open(os.path.join(group_name[0], name), 'r', encoding='utf-8') as file:
-				str_ustavki = file.read()
-				indexes_headers = []
-				level3 = parse_header(str_ustavki, '\n""""')
-				level2 = parse_header(str_ustavki, '\n~~~~')
-				if level3:
-					indexes_headers.extend(((i, 3) for i in level3))
-					indexes_headers.extend(((i, 2) for i in level2))
-				else:
-					indexes_headers.extend(((i, 3) for i in level2))
-				len_str_ustavki = len(str_ustavki)
-				for prot in protections:
-					fp = find_prot(str_ustavki, prot, filter=32)
-					indexes_headers.extend((i, 4) for i in fp)
-				for step in protections_steps:
-					fp = find_prot(str_ustavki, step, filter=32)
-					indexes_headers.extend((i, 5) for i in fp)
-				indexes_headers.sort(key=lambda x: x[0][0])
-				len_indexes_headers = len(indexes_headers)
-				for num in range(len_indexes_headers):
-					item_current = indexes_headers[num]
-					if item_current[1] == 4:
-						count_prot += 1
-					elif item_current[1] == 5:
-						count_steps += 1
-					print(str(item_current[1]) + ' ' * item_current[1] * 3 + str_ustavki[slice(*item_current[0])])
+def parse():
+	for group_name in os.walk(config.path_source, topdown=True, onerror=None, followlinks=False):
+		for name in group_name[2]:
+			if name == 'Журжево.rst':
+				with open(os.path.join(group_name[0], name), 'r', encoding='utf-8') as file:
+					str_ustavki = file.read()
+					indexes_headers = []
+					level3 = parse_header(str_ustavki, '\n""""')
+					level2 = parse_header(str_ustavki, '\n~~~~')
+					if level3:
+						indexes_headers.extend(((i, 3) for i in level3))
+						indexes_headers.extend(((i, 2) for i in level2))
+					else:
+						indexes_headers.extend(((i, 3) for i in level2))
+					len_str_ustavki = len(str_ustavki)
+					for prot in protections:
+						fp = find_prot(str_ustavki, prot, filter=32)
+						indexes_headers.extend((i, 4) for i in fp)
+					for step in protections_steps:
+						fp = find_prot(str_ustavki, step, filter=32)
+						indexes_headers.extend((i, 5) for i in fp)
+					indexes_headers.sort(key=lambda x: x[0][0])
+					len_indexes_headers = len(indexes_headers)
+					for num in range(len_indexes_headers):
+						item_current = indexes_headers[num]
+						if item_current[1] == 4:
+							count_prot += 1
+						elif item_current[1] == 5:
+							count_steps += 1
+						print(str(item_current[1]) + ' ' * item_current[1] * 3 + str_ustavki[slice(*item_current[0])])
 
-print(f'Всего РЗА: {count_prot} а ступеней: {count_steps}')
+	print(f'Всего РЗА: {count_prot} а ступеней: {count_steps}')
+
+
+
+with open('Оборудование.json', 'r', encoding='utf-8') as f:
+	pasport = json.load(f)
+
+with open('norms.json', 'r', encoding='utf-8') as f:
+	norms = json.load(f)
+
+def str_norm(i, norms):
+	return f'{i} {norms[i]["Тип"]} Профвосстановление: {norms[i]["Профвосстановление"]} Профконтроль: {norms[i]["Профконтроль"]}'
+
+
+for key_pr, item_pr in pasport.items():
+	labor_costs_all = 0.0
+	print(f'{key_pr}')
+	for key, item in item_pr.items():
+		print(f'    {key}')
+		labor_costs = 0.0
+		for i in  item:
+			if isinstance(i, list):
+				print(' '*8 + str_norm(i[0], norms) + f' - {i[1]} штук')
+				labor_costs += (norms[i[0]]["Профвосстановление"] + norms[i[0]]["Профконтроль"]) * i[1]
+			else:
+				print(' '*8 + str_norm(i, norms))
+				labor_costs += norms[i]["Профвосстановление"] + norms[i]["Профконтроль"]
+		print(f'        Всего по присоединению: {labor_costs:.1f}')
+		labor_costs_all += labor_costs
+	print(f'Всего по объекту: {labor_costs_all:.1f} чел.*час. а с учётом коэффициента 1,2 при выполнении работ в действующих электроустановках {labor_costs_all * 1.2:.1f} чел.*час.')
+
 
 
 
